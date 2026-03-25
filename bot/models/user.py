@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import BigInteger, Enum as SQLEnum, String
+from sqlalchemy import BigInteger, Enum as SQLEnum, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from bot.enums import UserRole, UserStatus
@@ -14,7 +14,7 @@ class UserEntity(BaseEntityWithAudit):
         BigInteger, unique=True, index=True, nullable=False
     )
     first_name: Mapped[str] = mapped_column(String(100), nullable=False)
-    last_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    last_name: Mapped[str] = mapped_column(String(100), nullable=False, default="")
     status: Mapped[UserStatus] = mapped_column(
         SQLEnum(UserStatus, name="user_status"),
         nullable=False,
@@ -25,7 +25,13 @@ class UserEntity(BaseEntityWithAudit):
         nullable=False,
         default=UserRole.USER,
     )
+    workspace_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("workspaces.id"), nullable=True, index=True
+    )
 
+    workspace: Mapped["WorkspaceEntity | None"] = relationship(
+        back_populates="members", lazy="selectin"
+    )
     work_sessions: Mapped[list["WorkSessionEntity"]] = relationship(
         back_populates="user", lazy="selectin"
     )

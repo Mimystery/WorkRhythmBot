@@ -26,8 +26,8 @@ class TeamService:
         self._user_repo = UserRepository(session=session)
         self._session_repo = SessionRepository(session=session)
 
-    async def get_all_members_with_status(self) -> list[dict]:
-        users = await self._user_repo.get_all()
+    async def get_all_members_with_status(self, workspace_id: int) -> list[dict]:
+        users = await self._user_repo.get_all_in_workspace(workspace_id)
         now = datetime.now(timezone.utc)
         result = []
 
@@ -35,7 +35,6 @@ class TeamService:
             sessions_today = await self._session_repo.get_today_sessions(user.id)
             active_session = await self._session_repo.get_active_session(user.id)
 
-            # Today's total work time
             today_work = timedelta()
             today_pause = timedelta()
             first_start = None
@@ -57,7 +56,6 @@ class TeamService:
                     if last_end is None or sess.ended_at > last_end:
                         last_end = sess.ended_at
 
-            # Current session info
             current_session_work = timedelta()
             current_session_start = None
             if active_session:
@@ -73,7 +71,7 @@ class TeamService:
                 {
                     "user": user,
                     "status_emoji": STATUS_EMOJI.get(user.status, "⚫"),
-                    "display_name": f"{user.first_name} {user.last_name}",
+                    "display_name": f"{user.first_name} {user.last_name}".strip(),
                     "status": user.status,
                     "today_work_time": today_work,
                     "today_pause_time": today_pause,
@@ -89,5 +87,5 @@ class TeamService:
         result.sort(key=lambda x: STATUS_ORDER.get(x["user"].status, 99))
         return result
 
-    async def get_team_management_data(self) -> list[dict]:
-        return await self.get_all_members_with_status()
+    async def get_team_management_data(self, workspace_id: int) -> list[dict]:
+        return await self.get_all_members_with_status(workspace_id)

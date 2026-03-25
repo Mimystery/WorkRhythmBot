@@ -25,36 +25,38 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
 
 
 async def _load_user(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
-    """Load user from DB into context.user_data. Returns True if found."""
+    """Load user from DB into context.user_data. Returns True if found and in workspace."""
     telegram_id = update.effective_user.id
     async with get_session() as session:
         user = await UserRepository(session=session).get_by_telegram_id(telegram_id)
-        if not user:
+        if not user or not user.workspace_id:
             return False
         context.user_data["db_user_id"] = user.id
         context.user_data["db_user_is_admin"] = user.is_admin
         context.user_data["db_user_is_superadmin"] = user.is_superadmin
         context.user_data["db_user_role"] = user.role
         context.user_data["db_user_status"] = user.status
+        context.user_data["db_workspace_id"] = user.workspace_id
+        context.user_data["db_user_telegram_id"] = user.telegram_id
     return True
+
+
+def _deny(msg: str):
+    async def _send(update: Update):
+        if update.callback_query:
+            await update.callback_query.answer(msg, show_alert=True)
+        elif update.message:
+            await update.message.reply_text(msg)
+    return _send
 
 
 def require_auth(func):
     @wraps(func)
     async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not await _load_user(update, context):
-            # Works for both callback queries and messages
-            if update.callback_query:
-                await update.callback_query.answer(
-                    "Please register first using /start", show_alert=True
-                )
-            elif update.message:
-                await update.message.reply_text(
-                    "Please register first using /start"
-                )
+            await _deny("Please use /start first")(update)
             return
         return await func(update, context)
-
     return wrapper
 
 
@@ -62,23 +64,10 @@ def require_admin(func):
     @wraps(func)
     async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not await _load_user(update, context):
-            if update.callback_query:
-                await update.callback_query.answer(
-                    "Please register first using /start", show_alert=True
-                )
-            elif update.message:
-                await update.message.reply_text(
-                    "Please register first using /start"
-                )
+            await _deny("Please use /start first")(update)
             return
         if not context.user_data.get("db_user_is_admin"):
-            if update.callback_query:
-                await update.callback_query.answer(
-                    "Admin access required", show_alert=True
-                )
-            elif update.message:
-                await update.message.reply_text("Admin access required")
+            await _deny("Admin access required")(update)
             return
         return await func(update, context)
-
     return wrapper

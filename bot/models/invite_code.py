@@ -13,7 +13,11 @@ class InviteCodeEntity(BaseEntityWithAudit):
 
     code: Mapped[str] = mapped_column(String(8), unique=True, index=True, nullable=False)
     first_name: Mapped[str] = mapped_column(String(100), nullable=False)
-    last_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    last_name: Mapped[str] = mapped_column(String(100), nullable=False, default="")
+    role: Mapped[str] = mapped_column(String(20), nullable=False, default="user")
+    workspace_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("workspaces.id"), nullable=False, index=True
+    )
     created_by: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("users.id"), nullable=False
     )
@@ -23,8 +27,8 @@ class InviteCodeEntity(BaseEntityWithAudit):
     used_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    role: Mapped[str] = mapped_column(String(20), nullable=False, default="user")
 
+    workspace: Mapped["WorkspaceEntity"] = relationship(lazy="selectin")
     creator: Mapped["UserEntity"] = relationship(
         foreign_keys=[created_by], lazy="selectin"
     )

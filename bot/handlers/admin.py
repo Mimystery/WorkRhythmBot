@@ -23,10 +23,7 @@ ENTER_FIRST_NAME = 0
 ENTER_LAST_NAME = 1
 ENTER_ROLE = 2
 
-ROLE_LABELS = {
-    "user": "👤 User",
-    "admin": "👑 Admin",
-}
+ROLE_LABELS = {"user": "👤 User", "admin": "👑 Admin"}
 
 
 async def generate_key_start(
@@ -38,14 +35,13 @@ async def generate_key_start(
     async with get_session() as session:
         auth = AuthService(session)
         user = await auth.get_user_by_telegram_id(query.from_user.id)
-        if not user or not user.is_admin:
+        if not user or not user.is_admin or not user.workspace_id:
             await query.answer("Admin access required", show_alert=True)
             return ConversationHandler.END
         context.user_data["db_user_id"] = user.id
+        context.user_data["db_workspace_id"] = user.workspace_id
 
-    await query.edit_message_text(
-        "🔑 Generate Invite Key\n\nEnter the first name:"
-    )
+    await query.edit_message_text("🔑 Generate Invite Key\n\nEnter the first name:")
     return ENTER_FIRST_NAME
 
 
@@ -61,7 +57,6 @@ async def receive_last_name(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> int:
     context.user_data["invite_last_name"] = update.message.text.strip()
-
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("👤 User", callback_data="role:user")],
         [InlineKeyboardButton("👑 Admin", callback_data="role:admin")],
@@ -76,10 +71,11 @@ async def receive_role(
     query = update.callback_query
     await query.answer()
 
-    role = query.data.split(":")[1]  # "user" or "admin"
+    role = query.data.split(":")[1]
     first_name = context.user_data.get("invite_first_name", "")
     last_name = context.user_data.get("invite_last_name", "")
     user_id = context.user_data.get("db_user_id")
+    workspace_id = context.user_data.get("db_workspace_id")
 
     try:
         async with get_session() as session:
@@ -88,6 +84,7 @@ async def receive_role(
                 first_name=first_name,
                 last_name=last_name,
                 created_by_user_id=user_id,
+                workspace_id=workspace_id,
                 role=role,
             )
 
@@ -104,7 +101,6 @@ async def receive_role(
             parse_mode="Markdown",
             reply_markup=keyboard,
         )
-
     except Exception as e:
         logger.exception("Error generating invite code")
         await query.edit_message_text(f"❌ Error: {e}")
@@ -137,14 +133,17 @@ async def team_management(
 ) -> None:
     query = update.callback_query
     await query.answer()
+    workspace_id = context.user_data["db_workspace_id"]
     requester_role = context.user_data.get("db_user_role", UserRole.USER)
-    await _show_team_management(query, requester_role)
+    await _show_team_management(query, workspace_id, requester_role)
 
 
-async def _show_team_management(query, requester_role: UserRole = UserRole.ADMIN) -> None:
+async def _show_team_management(
+    query, workspace_id: int, requester_role: UserRole = UserRole.ADMIN
+) -> None:
     async with get_session() as session:
         service = TeamService(session)
-        data = await service.get_team_management_data()
+        data = await service.get_team_management_data(workspace_id)
 
     if not data:
         keyboard = InlineKeyboardMarkup(
@@ -181,9 +180,6 @@ async def _show_team_management(query, requester_role: UserRole = UserRole.ADMIN
         lines.append(f"    Paused: {format_duration(m['today_pause_time'])}")
         lines.append(f"    Sessions: {m['total_sessions_today']}")
 
-        # Delete button logic:
-        # - superadmin can delete anyone except themselves
-        # - admin can only delete regular users
         can_delete = False
         if user.is_superadmin:
             can_delete = False
@@ -204,9 +200,8 @@ async def _show_team_management(query, requester_role: UserRole = UserRole.ADMIN
         [InlineKeyboardButton("◀️ Back to Admin", callback_data="admin:menu")]
     )
 
-    text = "\n".join(lines)
     keyboard = InlineKeyboardMarkup(buttons)
-    await query.edit_message_text(text, reply_markup=keyboard)
+    await query.edit_message_text("\n".join(lines), reply_markup=keyboard)
 
 
 @require_admin
@@ -215,7 +210,6 @@ async def confirm_delete_user(
 ) -> None:
     query = update.callback_query
     await query.answer()
-
     user_id = int(query.data.split(":")[2])
 
     async with get_session() as session:
@@ -227,12 +221,8 @@ async def confirm_delete_user(
 
     keyboard = InlineKeyboardMarkup([
         [
-            InlineKeyboardButton(
-                "✅ Yes, delete", callback_data=f"admin:confirm_del:{user_id}"
-            ),
-            InlineKeyboardButton(
-                "❌ Cancel", callback_data="admin:team_management"
-            ),
+            InlineKeyboardButton("✅ Yes, delete", callback_data=f"admin:confirm_del:{user_id}"),
+            InlineKeyboardButton("❌ Cancel", callback_data="admin:team_management"),
         ]
     ])
     await query.edit_message_text(
@@ -248,20 +238,19 @@ async def execute_delete_user(
 ) -> None:
     query = update.callback_query
     await query.answer()
-
     user_id = int(query.data.split(":")[2])
     requester_role = context.user_data.get("db_user_role", UserRole.USER)
+    workspace_id = context.user_data["db_workspace_id"]
 
     try:
         async with get_session() as session:
             auth = AuthService(session)
             name = await auth.delete_user(user_id, requester_role=requester_role)
-
         await query.answer(f"✅ {name} deleted", show_alert=True)
     except ValueError as e:
         await query.answer(f"❌ {e}", show_alert=True)
 
-    await _show_team_management(query, requester_role)
+    await _show_team_management(query, workspace_id, requester_role)
 
 
 generate_key_handler = ConversationHandler(

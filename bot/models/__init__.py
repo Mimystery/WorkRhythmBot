@@ -3,6 +3,7 @@ from bot.models.invite_code import InviteCodeEntity
 from bot.models.user import UserEntity
 from bot.models.work_pause import WorkPauseEntity
 from bot.models.work_session import WorkSessionEntity
+from bot.models.workspace import WorkspaceEntity
 
 __all__ = [
     "Base",
@@ -12,4 +13,5 @@ __all__ = [
     "InviteCodeEntity",
     "WorkSessionEntity",
     "WorkPauseEntity",
+    "WorkspaceEntity",
 ]

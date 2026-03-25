@@ -14,12 +14,21 @@ from bot.handlers.admin import (
 from bot.handlers.menu import (
     handle_admin_panel,
     handle_change_status,
+    handle_delete_workspace,
+    handle_leave_workspace,
     handle_my_status,
     handle_team_members,
 )
 from bot.handlers.start import registration_handler
 from bot.handlers.status import pause_work, start_work, stop_work
-from bot.keyboards.menu import BTN_ADMIN, BTN_CHANGE_STATUS, BTN_MY_STATUS, BTN_TEAM
+from bot.keyboards.menu import (
+    BTN_ADMIN,
+    BTN_CHANGE_STATUS,
+    BTN_DELETE_WORKSPACE,
+    BTN_LEAVE_WORKSPACE,
+    BTN_MY_STATUS,
+    BTN_TEAM,
+)
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -61,6 +70,8 @@ def main() -> None:
     app.add_handler(MessageHandler(filters.Text([BTN_MY_STATUS]), handle_my_status))
     app.add_handler(MessageHandler(filters.Text([BTN_CHANGE_STATUS]), handle_change_status))
     app.add_handler(MessageHandler(filters.Text([BTN_ADMIN]), handle_admin_panel))
+    app.add_handler(MessageHandler(filters.Text([BTN_LEAVE_WORKSPACE]), handle_leave_workspace))
+    app.add_handler(MessageHandler(filters.Text([BTN_DELETE_WORKSPACE]), handle_delete_workspace))
 
     # Status actions — InlineKeyboard callbacks
     app.add_handler(CallbackQueryHandler(start_work, pattern="^status:start$"))
