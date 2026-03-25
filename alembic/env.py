@@ -2,7 +2,6 @@ import asyncio
 from logging.config import fileConfig
 
 from alembic import context
-from sqlalchemy import Enum as SAEnum
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from bot.config import settings
@@ -13,13 +12,6 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 target_metadata = Base.metadata
-
-# Prevent SQLAlchemy from auto-creating ENUM types during migrations;
-# Alembic migration scripts manage enum lifecycle explicitly via DO $$ blocks.
-for table in target_metadata.tables.values():
-    for col in table.columns:
-        if isinstance(col.type, SAEnum):
-            col.type.create_type = False
 
 
 def run_migrations_offline() -> None:
