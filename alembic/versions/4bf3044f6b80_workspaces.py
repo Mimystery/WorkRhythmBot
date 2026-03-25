@@ -108,3 +108,7 @@ def downgrade() -> None:
     op.drop_table('users')
     op.drop_table('workspaces')
     # ### end Alembic commands ###
+    # Удаляем пользовательские ENUM-типы, если они существуют
+    op.execute("DROP TYPE IF EXISTS user_status CASCADE;")
+    op.execute("DROP TYPE IF EXISTS user_role CASCADE;")
+    op.execute("DROP TYPE IF EXISTS session_status CASCADE;")
