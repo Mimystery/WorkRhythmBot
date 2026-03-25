@@ -16,12 +16,12 @@ class UserEntity(BaseEntityWithAudit):
     first_name: Mapped[str] = mapped_column(String(100), nullable=False)
     last_name: Mapped[str] = mapped_column(String(100), nullable=False, default="")
     status: Mapped[UserStatus] = mapped_column(
-        SQLEnum(UserStatus, name="user_status"),
+        SQLEnum(UserStatus, name="user_status", create_type=False),
         nullable=False,
         default=UserStatus.OFFLINE,
     )
     role: Mapped[UserRole] = mapped_column(
-        SQLEnum(UserRole, name="user_role"),
+        SQLEnum(UserRole, name="user_role", create_type=False),
         nullable=False,
         default=UserRole.USER,
     )

@@ -25,7 +25,7 @@ class WorkSessionEntity(BaseEntityWithAudit):
         DateTime(timezone=True), nullable=True
     )
     status: Mapped[SessionStatus] = mapped_column(
-        SQLEnum(SessionStatus, name="session_status"),
+        SQLEnum(SessionStatus, name="session_status", create_type=False),
         nullable=False,
         default=SessionStatus.ACTIVE,
     )
