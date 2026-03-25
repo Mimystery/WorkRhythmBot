@@ -19,32 +19,31 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Pure SQL — bypass SQLAlchemy's ENUM auto-creation entirely.
-    op.execute("""
-    -- Drop everything if leftover from a failed run
-    DROP TABLE IF EXISTS work_pauses CASCADE;
-    DROP TABLE IF EXISTS work_sessions CASCADE;
-    DROP TABLE IF EXISTS invite_codes CASCADE;
-    DROP TABLE IF EXISTS users CASCADE;
-    DROP TABLE IF EXISTS workspaces CASCADE;
-    DROP TYPE IF EXISTS user_status CASCADE;
-    DROP TYPE IF EXISTS user_role CASCADE;
-    DROP TYPE IF EXISTS session_status CASCADE;
+    # Pure SQL — each op.execute() is a single statement (asyncpg requirement).
+    # Drop everything if leftover from a failed run
+    op.execute("DROP TABLE IF EXISTS work_pauses CASCADE")
+    op.execute("DROP TABLE IF EXISTS work_sessions CASCADE")
+    op.execute("DROP TABLE IF EXISTS invite_codes CASCADE")
+    op.execute("DROP TABLE IF EXISTS users CASCADE")
+    op.execute("DROP TABLE IF EXISTS workspaces CASCADE")
+    op.execute("DROP TYPE IF EXISTS user_status CASCADE")
+    op.execute("DROP TYPE IF EXISTS user_role CASCADE")
+    op.execute("DROP TYPE IF EXISTS session_status CASCADE")
 
-    -- ENUM types
-    CREATE TYPE user_status AS ENUM ('OFFLINE', 'WORKING', 'PAUSED');
-    CREATE TYPE user_role AS ENUM ('USER', 'ADMIN', 'SUPERADMIN');
-    CREATE TYPE session_status AS ENUM ('ACTIVE', 'PAUSED', 'COMPLETED');
+    # ENUM types
+    op.execute("CREATE TYPE user_status AS ENUM ('OFFLINE', 'WORKING', 'PAUSED')")
+    op.execute("CREATE TYPE user_role AS ENUM ('USER', 'ADMIN', 'SUPERADMIN')")
+    op.execute("CREATE TYPE session_status AS ENUM ('ACTIVE', 'PAUSED', 'COMPLETED')")
 
-    -- Tables
-    CREATE TABLE workspaces (
+    # Tables
+    op.execute("""CREATE TABLE workspaces (
         id BIGSERIAL PRIMARY KEY,
         name VARCHAR(200) NOT NULL,
         owner_telegram_id BIGINT NOT NULL,
         created_at TIMESTAMPTZ NOT NULL
-    );
+    )""")
 
-    CREATE TABLE users (
+    op.execute("""CREATE TABLE users (
         id BIGSERIAL PRIMARY KEY,
         telegram_id BIGINT NOT NULL,
         first_name VARCHAR(100) NOT NULL,
@@ -53,11 +52,11 @@ def upgrade() -> None:
         role user_role NOT NULL,
         workspace_id BIGINT REFERENCES workspaces(id),
         created_at TIMESTAMPTZ NOT NULL
-    );
-    CREATE UNIQUE INDEX ix_users_telegram_id ON users (telegram_id);
-    CREATE INDEX ix_users_workspace_id ON users (workspace_id);
+    )""")
+    op.execute("CREATE UNIQUE INDEX ix_users_telegram_id ON users (telegram_id)")
+    op.execute("CREATE INDEX ix_users_workspace_id ON users (workspace_id)")
 
-    CREATE TABLE invite_codes (
+    op.execute("""CREATE TABLE invite_codes (
         id BIGSERIAL PRIMARY KEY,
         code VARCHAR(8) NOT NULL,
         first_name VARCHAR(100) NOT NULL,
@@ -68,30 +67,29 @@ def upgrade() -> None:
         used_by BIGINT REFERENCES users(id),
         used_at TIMESTAMPTZ,
         created_at TIMESTAMPTZ NOT NULL
-    );
-    CREATE UNIQUE INDEX ix_invite_codes_code ON invite_codes (code);
-    CREATE INDEX ix_invite_codes_workspace_id ON invite_codes (workspace_id);
+    )""")
+    op.execute("CREATE UNIQUE INDEX ix_invite_codes_code ON invite_codes (code)")
+    op.execute("CREATE INDEX ix_invite_codes_workspace_id ON invite_codes (workspace_id)")
 
-    CREATE TABLE work_sessions (
+    op.execute("""CREATE TABLE work_sessions (
         id BIGSERIAL PRIMARY KEY,
         user_id BIGINT NOT NULL REFERENCES users(id),
         started_at TIMESTAMPTZ NOT NULL,
         ended_at TIMESTAMPTZ,
         status session_status NOT NULL,
         created_at TIMESTAMPTZ NOT NULL
-    );
-    CREATE INDEX ix_work_sessions_user_id ON work_sessions (user_id);
-    CREATE INDEX ix_work_sessions_user_status ON work_sessions (user_id, status);
+    )""")
+    op.execute("CREATE INDEX ix_work_sessions_user_id ON work_sessions (user_id)")
+    op.execute("CREATE INDEX ix_work_sessions_user_status ON work_sessions (user_id, status)")
 
-    CREATE TABLE work_pauses (
+    op.execute("""CREATE TABLE work_pauses (
         id BIGSERIAL PRIMARY KEY,
         session_id BIGINT NOT NULL REFERENCES work_sessions(id) ON DELETE CASCADE,
         paused_at TIMESTAMPTZ NOT NULL,
         resumed_at TIMESTAMPTZ,
         created_at TIMESTAMPTZ NOT NULL
-    );
-    CREATE INDEX ix_work_pauses_session_id ON work_pauses (session_id);
-    """)
+    )""")
+    op.execute("CREATE INDEX ix_work_pauses_session_id ON work_pauses (session_id)")
 
 
 def downgrade() -> None:
